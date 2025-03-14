@@ -11,10 +11,48 @@ by Jeffery Myers is marked with CC0 1.0. To view a copy of this license, visit h
 #include "rlgl.h"
 #include <stdio.h>
 
+#include <stdarg.h>
+#include <string.h>
 
-#include "resource_dir.h"	// utility header for SearchAndSetResourceDir
+#include "resource_dir.h"
+
+
+
+#include <stdarg.h>
+#include <string.h>
+typedef struct {
+    int resX;
+    int resY;
+    bool fullscreen;
+    bool vsync;
+} VideoConfig;
+
+typedef enum {
+    Log_DEBUG,
+    INFO,
+    WARN,
+    ERROR
+} VerbosityLevel;
+
+typedef struct {
+    VerbosityLevel level;
+    const char* module;
+} DebugChannel;
+
+void DebugLog(char* channelm, char* message);
+
+	// utility header for SearchAndSetResourceDir
 
 void DrawCubeTexture(Texture2D texture, Vector3 position, float width, float height, float length, Color color); // Draw cube textured
+
+void DebugLog(DebugChannel channel, VerbosityLevel level, const char* module, const char* format, ...) {
+    if (level >= channel.level && strcmp(module, channel.module) == 0) {
+        va_list args;
+        va_start(args, format);
+        vfprintf(stderr, format, args);
+        va_end(args);
+    }
+}
 
 void DrawCubeTexture(Texture2D texture, Vector3 position, float width, float height, float length, Color color)
 {
@@ -77,10 +115,62 @@ void DrawCubeTexture(Texture2D texture, Vector3 position, float width, float hei
     rlSetTexture(0);
 }
 
+
+bool ReadConfigFromFile(const char* filename, VideoConfig* config) {
+    FILE* file = fopen(filename, "r");
+    if (!file) {
+        fprintf(stderr, "Error opening config file: %s\n", filename);
+        return false;
+    }
+
+    char line[256];
+    while (fgets(line, sizeof(line), file)) {
+        // Remove any leading or trailing whitespace
+        line[strcspn(line, "\r\n")] = 0;
+
+        if (strncmp(line, "resx=", 5) == 0) {
+            config->resX = atoi(line + 5);
+        }
+        else if (strncmp(line, "resy=", 5) == 0) {
+            config->resY = atoi(line + 5);
+        }
+        else if (strncmp(line, "fullscreen=", 11) == 0) {
+            config->fullscreen = atoi(line + 11);
+        }
+        else if (strncmp(line, "vsync=", 6) == 0) {
+            config->vsync = atoi(line + 6);
+        }
+    }
+
+    fclose(file);
+    return true;
+}
+
 int main (int argc, char** argv)
 {
+     DebugChannel channel = { DEBUG, "main" };
+
+    DebugLog(channel, DEBUG, "main", "This is a debug message from %s module\n", "main");
+    DebugLog(channel, INFO, "main", "This is an info message from %s module\n", "main");
+    DebugLog(channel, WARN, "main", "This is a warning message from %s module\n", "main");
+    DebugLog(channel, ERROR, "main", "This is an error message from %s module\n", "main");
 	// Tell the window to use vsync and work on high DPI displays
 	SetConfigFlags(FLAG_VSYNC_HINT | FLAG_WINDOW_HIGHDPI);
+
+    VideoConfig config = { 640, 480, false, false };
+    if (!ReadConfigFromFile("config.ini", &config)) {
+        fprintf(stderr, "Using default configuration\n");
+    }
+    SetConfigFlags(FLAG_WINDOW_HIGHDPI);
+    if (config.vsync) {
+        SetConfigFlags(FLAG_VSYNC_HINT);
+    }
+
+    InitWindow(config.resX, config.resY, "Hello Raylib");
+
+    if (config.fullscreen) {
+        ToggleFullscreen();
+    }
 
 
     //leer argumentos de CLI
@@ -112,6 +202,7 @@ int main (int argc, char** argv)
 
 	// Create the window and OpenGL context
 	InitWindow(resX, resY, "Hello Raylib");
+
 
     if (wantsfullScrenn) ToggleFullscreen();
 
