@@ -14,9 +14,22 @@ by Jeffery Myers is marked with CC0 1.0. To view a copy of this license, visit h
 #include <stdarg.h>
 #include <string.h>
 
+//#include "resource_dir.h"
+#include <iostream>
+//Puntos h
+#include "GameObject.h"
 #include "resource_dir.h"
+#include <vector>
+#include "MemoryManager.h"
+#include "AudioManager.h"
 
-
+#include "lua.hpp"
+#include <lua.hpp>
+ 
+//
+extern "C" {
+#include "md5.h"
+}
 
 #include <stdarg.h>
 #include <string.h>
@@ -32,12 +45,95 @@ typedef enum {
     INFO,
     WARN,
     ERROR
-} VerbosityLevel;
+} VerbosityLevel;  // esta es mi maquina de estados?
 
 typedef struct {
     VerbosityLevel level;
     const char* module;
 } DebugChannel;
+
+Color brushColor = { 0, 0, 0, 255 };
+
+int Clear(lua_State* L)
+{
+        int r = (float)lua_tonumber(L, 1) / 255;
+        int g = (float)lua_tonumber(L, 2) / 255;
+        int b = (float)lua_tonumber(L, 3) / 255;
+		ClearBackground(Color{static_cast<unsigned char>(r), static_cast<unsigned char>(g),static_cast<unsigned char>(b), 255 });
+       
+    
+    return 0;
+}
+
+int SetBrushColor(lua_State* L)
+{
+        int r = (int)lua_tonumber(L, 1);
+        int g = (int)lua_tonumber(L, 2);
+        int b = (int)lua_tonumber(L, 3);
+		brushColor = { static_cast<unsigned char>(r), static_cast<unsigned char>(g), static_cast<unsigned char>(b), 255 };
+    return 0;
+}
+
+int DrawCircle(lua_State* L)
+{
+	int x = (int)lua_tonumber(L, 1);
+	int y = (int)lua_tonumber(L, 2);
+	int radius = (int)lua_tonumber(L, 3);
+	DrawCircle(x, y, radius, brushColor);
+
+    return 0;
+}
+
+int DrawRect(lua_State* L)
+{
+	int x = (int)lua_tonumber(L, 1);
+	int y = (int)lua_tonumber(L, 2);
+	int width = (int)lua_tonumber(L, 3);
+	int height = (int)lua_tonumber(L, 4);
+	DrawRectangle(x, y, width, height, brushColor);
+	return 0;
+}
+
+int DrawLine(lua_State* L)
+{
+	int x1 = (int)lua_tonumber(L, 1);
+	int y1 = (int)lua_tonumber(L, 2);
+	int x2 = (int)lua_tonumber(L, 3);
+	int y2 = (int)lua_tonumber(L, 4);
+	DrawLine(x1, y1, x2, y2, brushColor);
+	return 0;
+}
+
+int lua_mymodule(lua_State* L)
+{
+	static const luaL_Reg myModule[] =
+	{
+	{ "Clear", Clear },
+	{ "SetBrushColor", SetBrushColor },
+	{ "DrawCircle", DrawCircle },
+	{ "DrawRect", DrawRect },
+	{ "DrawLine", DrawLine },
+	{ NULL, NULL }
+	};
+	luaL_newlib(L, myModule);
+	return 1;
+}
+
+void luaDraw(lua_State* L, float dt)
+{
+    lua_getglobal(L, "Draw");
+    if (lua_isfunction(L, -1))
+    {
+        //Log(L"Calling draw function from lua");
+        lua_pushnumber(L, dt);
+        if (lua_pcall(L, 1, 0, 0) != 0)
+        {
+			std::cout << "Error running draw function: " << lua_tostring(L, -1) << std::endl;
+        }
+    }
+}
+
+
 
 void DebugLog(char* channelm, char* message);
 
@@ -148,12 +244,37 @@ bool ReadConfigFromFile(const char* filename, VideoConfig* config) {
 
 int main (int argc, char** argv)
 {
-     DebugChannel channel = { DEBUG, "main" };
+	lua_State* L = luaL_newstate();
+	luaL_openlibs(L);
+    luaL_requiref(L, "SimpleDraw", lua_mymodule, 1);
+	lua_pop(L, 1);
 
-    DebugLog(channel, DEBUG, "main", "This is a debug message from %s module\n", "main");
-    DebugLog(channel, INFO, "main", "This is an info message from %s module\n", "main");
+	if (luaL_dofile(L, "main.lua"))
+	{
+		std::cout << "Error running script: " << lua_tostring(L, -1) << std::endl;
+	}
+
+
+	char* input = "Hello World";
+	uint8_t result[16];
+    md5String(input, result);
+    for (int i = 0; i < 16; i++)
+    {
+		printf("%02x", result[i]);
+    }
+	char hash[33];
+   /* for (int  i = 0; i < 16; i++)
+    {
+        sprintf(&)hash[i * 2], "%02x", result[i]);
+    }*/
+	puts("");
+
+     //DebugChannel channel = { DEBUG, "main" };
+
+    //DebugLog(channel, DEBUG, "main", "This is a debug message from %s module\n", "main");
+    /*DebugLog(channel, INFO, "main", "This is an info message from %s module\n", "main");
     DebugLog(channel, WARN, "main", "This is a warning message from %s module\n", "main");
-    DebugLog(channel, ERROR, "main", "This is an error message from %s module\n", "main");
+    DebugLog(channel, ERROR, "main", "This is an error message from %s module\n", "main");*/
 	// Tell the window to use vsync and work on high DPI displays
 	SetConfigFlags(FLAG_VSYNC_HINT | FLAG_WINDOW_HIGHDPI);
 
@@ -167,6 +288,24 @@ int main (int argc, char** argv)
     }
 
     InitWindow(config.resX, config.resY, "Hello Raylib");
+
+	GameObject* myobj = new GameObject();
+	myobj->init();
+	myobj->setVelocity({ 100, 100 });
+    GameObject* otro = new GameObject();
+    otro->init({100, 100}, {250,100},BLUE);
+
+	GameObject*k = GameObject::Spawn({ 200,200 }, { 100,100 }, "test");   
+
+	std::vector<GameObject*> gameObjects;
+
+
+
+    for (int i = 0; i < 10; i++)
+    {
+		GameObject*k = GameObject::Spawn({ 5.0f*i,5.0f*i }, { 100,5.0f*i }, "test");
+		gameObjects.push_back(k);
+    }
 
     if (config.fullscreen) {
         ToggleFullscreen();
@@ -215,20 +354,34 @@ int main (int argc, char** argv)
 	Texture cubeTex = LoadTexture("tile.png");
 	
 	Camera3D camera = { 0 };
-	camera.position = (Vector3){ 4,0,2 };
-	camera.target = (Vector3){ 0,0,0 };
-	camera.up = (Vector3){ 0,1,0 };
+	camera.position = { 4,0,2 };
+	camera.target = { 0,0,0 };
+	camera.up = { 0,1,0 };
 	camera.fovy = 45;
 	camera.projection = CAMERA_PERSPECTIVE;
+
+	AudioManager::getInstance()->LoadBackgroundMusic("MaskedKing.mp3");
+	AudioManager::getInstance()->PlayBGM();
 
 
 	// game loop
 	while (!WindowShouldClose())		// run the loop untill the user presses ESCAPE or presses the Close button on the window
 	{
+		AudioManager::getInstance()->Update();
 		UpdateCamera(&camera, CAMERA_FREE);
+
+        for (int i = 0; i < gameObjects.size(); i++)
+        {
+			if (gameObjects[i]->enabled)  
+				k->enabled = i % 2 == 0;
+                			gameObjects[i]->update();
+        }
 
 		// drawing
 		BeginDrawing();
+
+		myobj->update();
+		otro->update();
 
 		// Setup the back buffer for drawing (clear color and depth buffers)
 		ClearBackground(BLACK);
@@ -239,20 +392,28 @@ int main (int argc, char** argv)
 		//DrawText("Hello Raylib", 200,200,20,WHITE);
 
 		// draw our texture to the screen
-		//DrawTexture(wabbit, 400, 200, WHITE);
+		DrawTexture(wabbit, 400, 200, WHITE);
 		
 		BeginMode3D(camera);
 		//DrawCube((Vector3) { 0, 0, 0 }, 1, 1, 1, RED);
 
-        DrawCubeTexture(cubeTex, (Vector3) { 0, 0, 0 }, 2, 2, 2, WHITE);
+        DrawCubeTexture(cubeTex, { 0, 0, 0 }, 2, 2, 2, WHITE);
         {
 
         }
-		DrawGrid(10, 1);
+		DrawGrid(1, 1);
 
 		EndMode3D();
 
+		myobj->draw();
+		otro->draw();
 		
+        for (int i = 0; i < gameObjects.size(); i++)
+        {
+            gameObjects[i]->draw();
+        }
+		MemoryManager::getInstance()->alloc(123);
+		luaDraw(L, GetFrameTime());
 
 		// end the frame and get ready for the next one  (display frame, poll input, etc...)
 		EndDrawing();
@@ -261,6 +422,8 @@ int main (int argc, char** argv)
 	// cleanup
 	// unload our texture so it can be cleaned up
 	UnloadTexture(wabbit);
+
+	lua_close(L);
 
 	// destroy the window and cleanup the OpenGL context
 	CloseWindow();

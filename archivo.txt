@@ -1,0 +1,95 @@
+[Video]
+resx=1024
+resy=800
+fullscreen=1
+vsync=1
+
+
+la necesidad de un algorithm pathfing eficiente viene a la constante demanda de ejecuccion de memoria 
+
+Su aplicacion se centra en entidades que propiamente no depende de un jugador y que se mueven en una escena para acatar una function o orden, es decir la gran mayoria de los NPC hacen uso de algoritmos de pathfinding cuando su comportamiento lo require.
+
+En la industria esta tecnica se ve en su maxima exponencia cuando se require de un 
+
+Obtimizacion de recursos, esto se tiene en mente cuando se trata de la simulacion y comportamiento de un gran numero de NPC que por cuenta propia toman deciciones. En juegos donde se hace uso de un gran numero de NPC se require el considerer el consume de memoria que se le puede asignar a cada uno de los agentes, por ello el limitar y optimizar el codigo es una tarea crucial al momento de programar los algoritmos Pathfiding
+
+
+
+esta cosa se me borra a cada rato, a de estar maldita
+
+extends AnimatableBody2D
+
+
+var life = 3
+var target = null
+const  SPEED = 100
+var animation = false
+var punch = false
+
+func hurt():
+	if life > 0:
+		animation = true
+		$AnimatedSprite2D.play("Hurt")
+		print("hurt")
+		$ouch.play()
+	else:
+		$OuchOK.play()
+		
+func on_AnimatedSprite_animation_finised():
+	if life == 0:
+		animation = true
+		$AnimatedSprite2D.play("Death")
+		$TimerOK.start()
+	else:
+		animation = false
+		$AnimatedSprite2D.play("Idle")
+		
+func _physics_process(delta):
+	if target:
+		var velocity = global_position.direction_to(target.global_position)
+		move_and_collide(velocity * SPEED * delta)
+		if animation == false:
+			$AnimatedSprite2D.play("Walk")
+			
+		if global_position.x >= target.global_position.x:
+			$AnimatedSprite2D.flip_h = false
+		if global_position.x <= target.global_position.x:
+			$AnimatedSprite2D.flip_h + true
+	for body in $HitHitbox.get_overlapping_bodies():
+		if(body.get_collision_layer() == 1):
+			if punch == false:
+				animation = true
+				punch = true
+				$TimePunch.start()
+				$ouch.play()
+				$AnimatedSprite2D.play("Attack")
+				body.hurt()
+				body.life -= 1
+				print(body.life)
+				
+	for body in $HitHitbox2.get_overlapping_bodies():
+		if(body.get_collision_layer() == 1):
+			if punch == false:
+				animation = true
+				punch = true
+				$TimePunch.start()
+				$ouch.play()
+				$AnimatedSprite2D.play("Attack")
+				body.hurt()
+				body.life -= 1
+				print(body.life)
+				
+func _on_detection_body_entered(body):
+	print(body.name)
+	if body.name == "Character":
+		target = body
+		
+func _on_detection_body_exited(body):
+	if body.name == "Character":
+		target = null
+		
+func _on_TimerOK_timeout():
+	queue_free()
+func _on_TimerPunch_timeout():
+	punch = false
+	animation = false		
